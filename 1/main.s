@@ -31,23 +31,26 @@ _start:
 
     jo ovf_err
 
-    idiv ebx
+    test ebx, ebx
 
     jz div_zero_err
+
+    idiv ebx
 
     mov [res], rax
     movsx eax, word[b]
     movsx ebx, word[a]
-    mov edx, 0
     mov ecx, dword[e] 
     sub ecx, ebx
     add eax, dword[d]
 
     jo ovf_err
 
-    idiv ecx
+    test ecx, ecx
 
     jz div_zero_err
+
+    idiv ecx
 
     add rax, [res]
 
