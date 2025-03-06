@@ -38,6 +38,7 @@ _start:
 
     jz div_zero_err
 
+    cdq
     idiv ebx
 
     mov rsi, rax
