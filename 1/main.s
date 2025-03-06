@@ -19,7 +19,8 @@ global _start
 _start:
     movsx eax, word[a]
     movsx ebx, word[b]
-    imul ebx, dword[c]
+    mov ecx, dword[c]
+    imul ebx, ecx
 
     jo ovf_err
 
@@ -27,7 +28,9 @@ _start:
 
     jo ovf_err
 
-    imul eax, dword[d]
+    mov ecx, dword[d]
+
+    imul ecx
 
     jo ovf_err
 
@@ -37,12 +40,15 @@ _start:
 
     idiv ebx
 
-    mov [res], rax
+    mov rsi, rax
     movsx eax, word[b]
     movsx ebx, word[a]
+    add eax, ecx
+
+    jo ovf_err
+
     mov ecx, dword[e] 
     sub ecx, ebx
-    add eax, dword[d]
 
     jo ovf_err
 
@@ -50,9 +56,10 @@ _start:
 
     jz div_zero_err
 
+    cdq
     idiv ecx
 
-    add rax, [res]
+    add rax, rsi
 
     jo ovf_err
 
