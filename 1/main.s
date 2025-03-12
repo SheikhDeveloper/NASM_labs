@@ -17,50 +17,65 @@ e:
 section .text
 global _start
 _start:
-    movsx eax, word[a]
-    movsx ebx, word[b]
+    movsx eax, word[b]
+    movsx ebx, word[a]
     mov ecx, dword[c]
-    imul ebx, ecx
+    mov r11d, ebx ; r11d = a
+    mov r12d, eax ; r12d = b
+
+    imul ecx ; edx:eax = b * c
+
+    sal rdx, 32
+    or rdx, rax ; rdx = b * c
 
     jo ovf_err
 
-    add ebx, eax
+    mov r13, rdx ; r13 = b * c
+
+    add rbx, r13 ; rbx = a + b * c
 
     jo ovf_err
 
     mov ecx, dword[d]
+    mov rax, 0
+    mov eax, ebx ; eax = a
 
-    imul ecx
+    imul ecx ; edx:eax = d * a
+
+    sal rdx, 32
+    or rdx, rax ; rdx = d * a
 
     jo ovf_err
 
-    test ebx, ebx
+    mov rax, rdx ; rax = d * a
+
+    test rbx, rbx ; Check if (a + b * c) == 0
 
     jz div_zero_err
 
     cdq
-    idiv ebx
+    idiv rbx ; rax = (d * a) / (a + b * c)
 
     mov rsi, rax
-    movsx eax, word[b]
-    movsx ebx, word[a]
-    add eax, ecx
+    movsx eax, r12d
+    movsx ebx, r11d
+    add eax, ecx ; eax = (d + b)
 
     jo ovf_err
 
-    mov ecx, dword[e] 
-    sub ecx, ebx
+    mov ecx, dword[e] ; ecx = e 
+    sub ecx, ebx ; ecx = e - a
 
     jo ovf_err
 
-    test ecx, ecx
+    test ecx, ecx ; Check if (e - a) == 0
 
     jz div_zero_err
 
     cdq
-    idiv ecx
+    idiv ecx ; eax = (d + b) / (e - a)
 
-    add rax, rsi
+    add rax, rsi ; rax = (d * a) / (a + b * c) + (d + b) / (e - a)
 
     jo ovf_err
 
