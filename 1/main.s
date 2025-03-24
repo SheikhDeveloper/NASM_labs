@@ -4,15 +4,15 @@ section .data
 res:
     dq 0
 a:
-    dw 30
+    dw 32767
 b:
-    dw 10
+    dw 32767
 c:
-    dd 35
+    dd 2147483647
 d:
-    dd 25
+    dd 1073741823
 e:
-    dd 15
+    dd 2147483647
 
 section .text
 global _start
@@ -26,6 +26,7 @@ _start:
     imul ecx ; edx:eax = b * c
 
     sal rdx, 32
+    mov eax, eax
     or rdx, rax ; rdx = b * c
 
     jo ovf_err
@@ -38,11 +39,12 @@ _start:
 
     mov ecx, dword[d]
     mov rax, 0
-    mov eax, ebx ; eax = a
+    mov eax, r11d ; eax = a
 
     imul ecx ; edx:eax = d * a
 
     sal rdx, 32
+    mov eax, eax
     or rdx, rax ; rdx = d * a
 
     jo ovf_err
@@ -53,12 +55,12 @@ _start:
 
     jz div_zero_err
 
-    cdq
+    cqo
     idiv rbx ; rax = (d * a) / (a + b * c)
 
     mov rsi, rax
-    movsx eax, r12d
-    movsx ebx, r11d
+    mov eax, r12d
+    mov ebx, r11d
     add eax, ecx ; eax = (d + b)
 
     jo ovf_err
@@ -75,6 +77,7 @@ _start:
     cdq
     idiv ecx ; eax = (d + b) / (e - a)
 
+    cdqe ;expand eax to 64-bit
     add rax, rsi ; rax = (d * a) / (a + b * c) + (d + b) / (e - a)
 
     jo ovf_err
