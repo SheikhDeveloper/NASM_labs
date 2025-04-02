@@ -5,18 +5,16 @@ bits 64
 section .data
 %define MAX_SIZE 10
 
-struc Array
-    .shape : resq 2 ; shape[0] = rows, shape[1] = columns
-    .ndim : resd 1 ; number of dimensions
-    .dtype : resd 1 ; data type(0=int32)
-    .strides : resq 2 ; strides[0] = row stride, strides[1] = column stride
-    .data : resd MAX_SIZE
+struc Matrix
+    .shape : dq 2 ; shape[0] = rows, shape[1] = columns
+    .dtype : dd 1 ; data type(0=int32)
+    .strides : dq 2 ; strides[0] = row stride, strides[1] = column stride
+    .data : dd MAX_SIZE
 endstruc
 
-arr:
-    istruc Array
+matr1:
+    istruc Matrix
     at .shape, dq 3, 3 ; shape 3x3
-    at .ndim, dd 2 ; 2 dims
     at .dtype, dd 0 ; int32
     at .strides, dq 12, 4 ; strides 12, 4
     at .data, dd 3, 4, 7, 8, 5, 6, 1, 2, 9, 0
@@ -61,16 +59,33 @@ binary_search:
     mov r9, r10 ; right = mid
     jmp .search_loop
 
+    .end:
+    ret
 
-insertion_sort_1d:
-; rdi = arr, rsi = size
-    dec rsi
-    jz .end
 
-    .outer:
-    mov eax, [rdi + rsi * 4 - 4]
-    cmp eax, [rdi + rsi * 4]
-    jle .no_swap
+; Function that inserts an element into an array by index
+; Input: rdi = array, rsi = index, edx = value
+; Output: array
+insert:
+    mov [rdi + rsi * 4], edx
+    ret
+
+
+
+; Insertion sort with binary search
+; Input: rdi = array, rdx = size, bx = direction
+insertion_sort:
+    cmp rsi, 1
+    jle .end
+
+    mov rcx, 0 ; i = 0
+
+    .loop:
+    cmp rcx, rdx
+    jge .end
+    mov esi, [rdi + rcx * 4] ; esi = key = arr[i]
+
+    call binary_search
 
     .end:
     ret
