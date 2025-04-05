@@ -8,7 +8,7 @@ section .data
 matr1: dd 3, 4, 7, 8, 5, 6, 1, 2, 9 ; matrix 1
                                     ; 3 4 7
                                     ; 8 5 6
-                                    ; 1 2 9
+                                    ; 2 1 9
 matr1_shape: dd 3, 3 ; shape 3x3
 
 section .text
@@ -106,7 +106,11 @@ _start:
     mov r15d, r13d
     imul r15d, edx
     mov r8d, r15d ; r8d = i * number of columns
+    %ifdef REVERSE
+    mov bx, 1
+    %else
     mov bx, 0
+    %endif
     push rdx
     call insertion_sort
     pop rdx
