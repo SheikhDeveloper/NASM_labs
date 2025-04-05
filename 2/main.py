@@ -9,7 +9,7 @@ def insertions_with_bin_search_sort(nums: list[int], reversed: bool) -> list[int
     [3, 2, 1]
     >>> insertions_with_bin_search_sort([3, 2, 1], False)
     [1, 2, 3]
-    >>> insertions_with_bin_search_sort([3, 5, 100500, 7, -1, 0], False)
+    >>> insertions_with_bin_search_sort([3, 5, 100500, -1, 7, 0], False)
     [-1, 0, 3, 5, 7, 100500]
     """
     for i in range(len(nums)):
@@ -27,7 +27,10 @@ def insertions_with_bin_search_sort(nums: list[int], reversed: bool) -> list[int
                     left = middle + 1
                 else:
                     right = middle
-        nums.insert(left, nums.pop(i))
+        num = nums[i]
+        for j in range(i, left, -1):
+            nums[j] = nums[j - 1]
+        nums[left] = num
     return nums
 
 
