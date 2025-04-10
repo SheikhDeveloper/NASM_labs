@@ -5,12 +5,11 @@ bits 64
 
 section .data
 
-matr1: dd 3, 4, 7, 8, 5, 6, 1, 2, 9 ; matrix 1
-                                    ; 3 4 7
-                                    ; 8 5 6
-                                    ; 2 1 9
-matr1_shape: dd 3, 3 ; shape 3x3
-
+matr1: dd 4  ; matrix 1
+                                    ; 4 5 7 2
+                                    ; 8 5 6 3
+                                    ; 9 2 1 4
+matr1_shape: dd 1, 1 ; shape 2x2
 section .text
 global _start
 
@@ -18,6 +17,8 @@ global _start
 ; Input: edi = arr, esi = key, r9d = right bound, bx = direction, r8d = left bound
 ; Output: r8d = index of searched element
 binary_search:
+
+    mov r8d, r13d
 
     .search_loop:
     cmp r8d, r9d ; left < right
@@ -60,6 +61,8 @@ insertion_sort:
     mov ecx, r8d ; i = left
 
     add edx, r8d ; size = left + size
+     
+    mov r13d, r8d ; r13d = left bound
 
     .loop:
     cmp ecx, edx ; i < size
@@ -112,7 +115,9 @@ _start:
     mov bx, 0
     %endif
     push rdx
+    push r13
     call insertion_sort
+    pop r13
     pop rdx
 
     inc r13d
