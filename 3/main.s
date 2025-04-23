@@ -6,6 +6,7 @@ section .data
     filename db "input", 0
     descriptor dd 0
     error_msg db "Input Format error", 0
+    newline db 0xA ; '\n' symbol
 
 section .text
 global _start
@@ -69,6 +70,115 @@ ceasar_cipher:
     mov rax, rbx ; return encoded string
     ret
 
+; Trim spaces function
+; Input: rbx - buffer, rdx - length
+; Output: rdx - new length
+trim_spaces:
+    push rbx
+    push rsi
+    push rdi
+    push rcx
+    push rax
+
+    mov rsi, rbx        ; Source pointer
+    mov rdi, rbx        ; Destination pointer
+    xor rcx, rcx        ; Source index
+    xor rax, rax        ; Current char
+    mov r9, 0           ; Previous char (0 - non-space, 1 - space)
+
+    ; Skip leading spaces
+    .skip_leading:
+    cmp rcx, rdx
+    jge .end_leading
+    mov al, [rsi + rcx]
+    cmp al, ' '
+    jne .end_leading
+    inc rcx
+    jmp .skip_leading
+
+    .end_leading:
+
+    ; Main processing loop
+    .loop:
+    cmp rcx, rdx
+    jge .end_loop
+    mov al, [rsi + rcx]
+
+    ; Check for newline character
+    cmp al, 0x0A        ; '\n'
+    je .handle_newline
+
+    cmp al, ' '
+    jne .not_space
+
+    ; Handle space character
+    cmp r9, 1
+    je .skip_copy
+    mov r9, 1
+    mov [rdi], al
+    inc rdi
+    jmp .next
+
+    .handle_newline:
+    ; Copy newline and skip leading spaces after it
+    mov [rdi], al
+    inc rdi
+    mov r9, 0           ; Reset previous space flag
+
+    .skip_after_newline:
+    inc rcx
+    cmp rcx, rdx
+    jge .end_loop       ; End of buffer
+    mov al, [rsi + rcx]
+    cmp al, ' '
+    je .skip_after_newline
+    dec rcx             ; Re-process the non-space character
+    jmp .next
+
+    .not_space:
+    mov r9, 0
+    mov [rdi], al
+    inc rdi
+
+    .skip_copy:
+    .next:
+    inc rcx
+    jmp .loop
+
+    .end_loop:
+
+    ; Trim trailing spaces
+    cmp rdi, rbx
+    je .no_trailing
+    dec rdi
+    cmp byte [rdi], ' '
+    jne .no_trailing_inc
+
+    .trim_trailing_loop:
+    cmp rdi, rbx
+    jl .trim_done
+    cmp byte [rdi], ' '
+    jne .trim_done
+    dec rdi
+    jmp .trim_trailing_loop
+
+    .trim_done:
+    inc rdi
+
+    .no_trailing_inc:
+    inc rdi
+
+    .no_trailing:
+    mov rdx, rdi
+    sub rdx, rbx        ; New length
+
+    pop rax
+    pop rcx
+    pop rdi
+    pop rsi
+    pop rbx
+    ret
+
 _start:
     mov rax, 2 ; open file filename
     mov rdi, filename
@@ -105,6 +215,9 @@ _start:
     jle .exit
     mov rbx, file_buffer
     mov rdx, rax
+
+    call trim_spaces
+
     push rcx
     mov rcx, r8
     call ceasar_cipher
