@@ -1,7 +1,9 @@
 bits 64
 
+%define BUFFER_SIZE 10
+
 section .data
-    file_buffer times 256 db 0
+    file_buffer times BUFFER_SIZE db 0
     shift_buffer dq 0
     filename db "input", 0
     env_src db "SRC=", 0
@@ -37,6 +39,7 @@ string_len:
 ; rdx - string length
 ; return: rax = encoded string
 ceasar_cipher:
+    push r9
     mov r9, rcx ; save shift value
     xor rcx, rcx ; counter = 0
     
@@ -89,6 +92,7 @@ ceasar_cipher:
 
     .exit:
     mov rax, rbx ; return encoded string
+    pop r9
     ret
 
 ; Trim spaces function
@@ -105,10 +109,13 @@ trim_spaces:
     mov rdi, rbx        ; Destination pointer
     xor rcx, rcx        ; Source index
     xor rax, rax        ; Current char
-    mov r9, 0           ; Previous char (0 - non-space, 1 - space)
+    ;mov r9, 0           ; Previous char (0 - non-space, 1 - space, 2 - newline)
 
     ; Skip leading spaces
     .skip_leading:
+    cmp r9, 1
+    cmp r9, 2
+    jne .end_leading
     cmp rcx, rdx
     jge .end_leading
     mov al, [rsi + rcx]
@@ -144,7 +151,7 @@ trim_spaces:
     ; Copy newline and skip leading spaces after it
     mov [rdi], al
     inc rdi
-    mov r9, 0           ; Reset previous space flag
+    mov r9, 2           ; Reset previous space flag
 
     .skip_after_newline:
     inc rcx
@@ -210,6 +217,8 @@ _start:
     add rsi, 8 ; skip NULL argument
     mov rbx, rsi ; rbx = envp[0]
     mov r12, rsi ; r12 = envp[0], to search for KEY
+
+    mov r9, 1
 
     .find_src:
     mov rdx, [rbx] ; rdx = envp[i] pointer
@@ -310,7 +319,7 @@ _start:
     mov rax, 0 ; read from descriptor
     mov edi, [descriptor]
     mov rsi, file_buffer
-    mov rdx, 256 ; read 256(buffer size) bytes
+    mov rdx, BUFFER_SIZE ; read BUFFER_SIZE bytes
     syscall
     cmp rax, 0
     jle .exit
@@ -324,6 +333,8 @@ _start:
     call ceasar_cipher
     mov r13, rax
     pop rcx
+    cmp rdx, 0
+    jle .process_loop
     mov rax, 1 ; write
     mov rdi, 1 ; stdout
     mov rsi, r13 ; encoded string
