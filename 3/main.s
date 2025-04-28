@@ -44,14 +44,15 @@ ceasar_cipher:
     cmp rcx, rdx 
     jge .exit ; if counter >= string length, exit
     movzx r12, byte [rbx + rcx] ; get char
-    cmp r12, 'a' 
-    jl .isalpha_else ; if char < 'a', skip
-    cmp r12, 'z'
-    jle .islower_condition ; if 'a' <= char <= 'z', then it is lower case
-    cmp r12, 'A'
-    jl .isalpha_else ; if 'z' < char < 'A', skip
+    cmp r12, 'A' 
+    jl .isalpha_else ; if char < 'A', skip
     cmp r12, 'Z'
-    jle .isupper_condition ; if 'A' <= char <= 'Z', then it is upper case
+    jle .isupper_condition ; if 'A' <= char <= 'Z', then it is lower case
+    cmp r12, 'a'
+    jl .isalpha_else ; if 'Z' < char < 'a', skip
+    cmp r12, 'z'
+    jle .islower_condition ; if 'a' <= char <= 'z', then it is upper case
+    jg .isalpha_else ; if char > 'z', skip
     jmp .loop
 
     .islower_condition:
