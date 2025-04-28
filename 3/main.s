@@ -4,12 +4,32 @@ section .data
     file_buffer times 256 db 0
     shift_buffer dq 0
     filename db "input", 0
+    env_src db "SRC=", 0
+    env_key db "KEY=", 0
     descriptor dd 0
     error_msg db "Input Format error", 0
+    env_error_msg db "ENV arguments error", 0
     newline db 0xA ; '\n' symbol
+
+section .bss
+    src_ptr resq 1
+    key_ptr resq 1
 
 section .text
 global _start
+
+; String length function
+; Input: rbx - string
+; Output: rax - string length
+string_len:
+    mov rax, 0
+    .loop:
+    cmp byte [rbx + rax], 0
+    je .exit
+    inc rax
+    jmp .loop
+    .exit:
+    ret
 
 ; Ceasar Cipher function
 ; rcx - shift value
@@ -180,8 +200,57 @@ trim_spaces:
     ret
 
 _start:
-    mov rax, 2 ; open file filename
-    mov rdi, filename
+
+    mov rax, [rsp] ; get argc
+    lea rsi, [rsp + 8] ; rsi = argv[0]
+    mov rcx, rax
+    shl rcx, 3 ; rcx = rcx * 8 (8 bytes per argument)
+    add rsi, rcx ; rsi = address of argv[argc]
+    add rsi, 8 ; skip NULL argument
+    mov rbx, rsi ; rbx = envp[0]
+    mov r12, rsi ; r12 = envp[0], to search for KEY
+
+    .find_src:
+    mov rdx, [rbx] ; rdx = envp[i] pointer
+    test rdx, rdx
+    jz .env_args_error
+    mov rsi, rdx ; rsi = envp[i] string
+    mov rdi, env_src ; rdi = "SRC="
+    mov rcx, 4
+    repe cmpsb
+    je .found_src
+    add rbx, 8 ; go to next envp string
+    mov r12, rbx
+    jmp .find_src
+    
+    .found_src:
+    mov rax, [rbx] 
+    lea rax, [rax + 4]
+    mov [src_ptr], rax
+
+    .after_src:
+    mov rbx, r12 ; rbx = envp[0]
+
+    .find_key:
+    mov rdx, [rbx] ; rdx = envp[i] pointer
+    test rdx, rdx
+    jz .env_args_error
+    mov rsi, rdx ; rsi = envp[i] string
+    mov rdi, env_key ; rdi = "KEY="
+    mov rcx, 4
+    repe cmpsb
+    je .found_key
+    add rbx, 8
+    jmp .find_key
+
+    .found_key:
+    mov rax, [rbx]
+    lea rax, [rax + 4]
+    mov [key_ptr], rax
+
+    .open_file:
+    mov rax, 2 ; open file src_ptr
+    mov rdi, [src_ptr]
     mov rsi, 0 ; read only
     mov rdx, 0 ; no flags
     syscall
@@ -191,19 +260,50 @@ _start:
     mov [descriptor], eax ; save file descriptor
 
     .read_key:
-    mov rax, 0 ; read from descriptor
-    mov edi, [descriptor] ; file descriptor
-    mov rsi, shift_buffer
-    mov rdx, 2 ; read 2 bytes
-    syscall
-    cmp rax, 0 ; check if read was successful
-    jle .file_format_error
-    cmp rax, 2 ; check if read 2 bytes
-    jl .file_format_error
-    movzx r8, byte [shift_buffer]
-    sub r8, '0' ; key = int(string(shift_buffer))
-    mov rcx, 0
-    jmp .process_loop
+    mov r11, [key_ptr]
+    mov rcx, 0 
+    mov rbx, r11
+    call string_len
+    mov r15, rax
+    mov rcx, rax
+    sub rcx, 1
+    mov r8, 0
+
+    .read_key_loop:
+    cmp rcx, -1
+    jle .get_true_key
+    movzx r14, byte [r11 + rcx]
+    sub r14, '0' ; convert char digit of key to int
+    mov r13, r15
+    sub r13, rcx
+    dec r13
+    jmp .inner_key_loop
+
+    .inner_key_loop:
+    cmp r13, 0 
+    jle .post_inner_key_loop
+    push rax
+    push rcx
+    mov rax, r14
+    mov rcx, 10
+    mul rcx
+    mov r14, rax
+    pop rcx
+    pop rax
+    dec r13
+    jmp .inner_key_loop
+
+    .post_inner_key_loop:
+    add r8, r14 ; r14 = key[len - i - 1] * (10 ^ i), r8 sums up to key
+    dec rcx
+    jmp .read_key_loop
+
+    .get_true_key:
+    mov rax, r8
+    mov rcx, 26
+    xor rdx, rdx
+    div rcx
+    mov r8, rdx
 
     .process_loop:
     mov rax, 0 ; read from descriptor
@@ -245,3 +345,15 @@ _start:
     xor rdi, rdi 
     mov rdi, 1 ; exit code 1 (error)
     syscall
+
+    .env_args_error:
+    mov rax, 1 ; write
+    mov rdi, 1 ; stdout
+    mov rsi, env_error_msg ; error message
+    mov rdx, 20 ; length of error message
+    syscall
+    mov rax, 60 ; exit
+    xor rdi, rdi 
+    mov rdi, 2 ; exit code 2 (error)
+    syscall
+

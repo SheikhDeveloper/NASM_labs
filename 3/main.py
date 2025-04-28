@@ -3,15 +3,15 @@ def ceasar_cipher(text, key):
     for char in text:
         if char.isalpha():
             if char.isupper():
-                result += chr((ord(char) + key - 65) % 26 + 65)
+                result += chr((ord(char) + (key % 26) - 65) % 26 + 65)
             else:
-                result += chr((ord(char) + key - 97) % 26 + 97)
+                result += chr((ord(char) + (key % 26) - 97) % 26 + 97)
         else:
             result += char
     return result
 
+key = 1234
 with open("input") as f:
-    key = int(f.readline())
     text = f.readline().strip()
     while text != "":
         print(ceasar_cipher(text, key))

@@ -9,6 +9,8 @@ OBJS = $(SRCS:.s=.o)
 
 EXE = lab
 
+.PHONY: all clean
+
 all: $(SRCS) $(EXE)
 
 clean:
