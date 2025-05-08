@@ -7,6 +7,7 @@ section .data
     error_input     db "Error: invalid input", 10, 0
     epsilon         dd 1e-6                ; Epsilon bound (0.000001)
     mode_w          db "w", 0              ; Open file in write mode
+    align 16
     abs_mask        dd 0x7FFFFFFF, 0, 0, 0 ; Mask for absolute value
 
 section .bss
