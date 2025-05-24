@@ -1,25 +1,29 @@
+bits 64
 section .data
     input_format    db "%f", 0             ; Input format for x
-    output_format   db "Result: %.6f", 10, 0 ; Output format
+    output_format   db "Result: %.*f", 10, 0 ; Output format
     file_format     db "%d: %.6f", 10, 0   ; File format
     error_args      db "Error: expected filename argument", 10, 0
     error_file      db "Error: could not open file", 10, 0
     error_input     db "Error: invalid input", 10, 0
-    epsilon         dd 1e-6                ; Epsilon bound (0.000001)
     mode_w          db "w", 0              ; Open file in write mode
+    input_x_message db "Input x: ", 0
+    input_epsilon   db "Input epsilon: ", 0
     align 16
     abs_mask        dd 0x7FFFFFFF, 0, 0, 0 ; Mask for absolute value
 
 section .bss
     x               resd 1                 ; Input x value
+    epsilon         resd 1                 ; Epsilon
     sum             resd 1                 ; Series sum
     current_term    resd 1                 ; Current term
     n               resd 1                 ; Current number
     file_handle     resq 1                 ; File pointer
+    print_precision resq 1                 ; Printing precision
 
 section .text
     global main
-    extern scanf, printf, fopen, fprintf, fclose, exit
+    extern scanf, printf, fopen, fprintf, fclose, exit, getchar, sinh, log10, floor
 
 main:
     push rbp
@@ -37,6 +41,11 @@ main:
     jz .file_error
     mov [file_handle], rax
 
+    .input_processing:
+    mov rdi, input_x_message
+    mov rax, 0
+    call printf
+
     ; Input x
     mov rdi, input_format
     mov rsi, x
@@ -44,6 +53,35 @@ main:
     call scanf
     cmp eax, 1
     jne .input_error
+
+    mov rdi, input_epsilon
+    mov rax, 0
+    call printf
+
+    ; Input epsilon
+    mov rdi, input_format
+    mov rsi, epsilon
+    xor eax, eax
+    call scanf
+    cmp eax, 1
+    jne .input_error
+    cmp dword [epsilon], 0
+    jle .input_error
+
+    ; Calculate log10(epsilon) (decimal length of epsilon)
+    movsd    xmm0, qword [epsilon]
+    call     log10
+    xorpd    xmm1, xmm1
+    subsd    xmm1, xmm0
+    movapd   xmm0, xmm1
+    call     floor
+    cvtsd2si r15d, xmm0
+    cmp      r15d, 0
+    jge      .r15d_ok
+    mov      r15d, 0
+
+    .r15d_ok:
+    mov     [print_precision], r15d
 
     ; Initialization
     movss xmm0, [x]
@@ -91,6 +129,7 @@ main:
     ; Print sum
     cvtss2sd xmm0, [sum]
     mov rdi, output_format
+    mov rsi, r15
     mov rax, 1
     call printf
 
@@ -117,7 +156,13 @@ main:
 .input_error:
     mov rdi, error_input
     call printf
-    mov eax, 1
+    .clear_buffer:
+        call getchar
+        cmp eax, -1
+        je .input_processing
+        cmp eax, 10
+        jne .clear_buffer
+    jmp .input_processing 
 
 .exit:
     leave
