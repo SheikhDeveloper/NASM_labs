@@ -110,7 +110,8 @@ process_string:
     cmp al, 'a'
     jl .after_cypher ; if char < 'a', skip
     cmp al, 'z'
-    jle .islower_condition ; if char > 'z', go to islower_condition 
+    jle .islower_condition ; if char < 'z', go to islower_condition 
+    jg .after_cypher
 
     .isupper_condition:
     sub rax, 'A'
