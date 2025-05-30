@@ -1,102 +1,81 @@
 bits 64
 
-section .bss
-    buffer: resq 64
-
 section .text
 global process_image_asm
 
 process_image_asm:
-    push rbp
-    mov rbp, rsp
     push rbx
     push r12
     push r13
     push r14
     push r15
 
-    ; Сохраняем аргументы
-    mov r14, rdi        ; image pointer
-    mov r15, rsi        ; width
-    mov rbx, rdx        ; height
-    mov r12, rcx        ; channels
+    mov r9, [rdi]       ; r9 = *image (указатель на данные изображения)
+    mov eax, esi        ; width
+    imul eax, ecx       ; eax = width * channels (line_size)
+    mov r8d, eax        ; r8d = line_size
+    mov r10d, edx       ; r10d = height
 
-    ; Вычисляем размер буфера: width * height * channels
-    mov rax, r15
-    imul rax, rbx
-    imul rax, r12
-    mov r8, rax         ; сохраняем размер
+    mov eax, r10d
+    shr eax, 1          ; eax = height / 2
+    test eax, eax
+    jz .end_func        ; Если 0, выход
 
-    ; Копируем исходное изображение в буфер
-    mov rsi, r14        ; источник (image)
-    mov rdi, [buffer]        ; приемник (buffer)
-    mov rcx, r8         ; количество байт
-    cld
-    rep movsb
+    mov r14, r9         ; r14 = начало верхней строки (y)
+    mov r15, r9         ; r15 = будет началом нижней строки (mirrored_y)
+    mov eax, r10d
+    dec eax             ; eax = height - 1
+    imul eax, r8d       ; eax = (height-1) * line_size
+    add r15, rax        ; r15 = адрес последней строки
 
-    ; Обработка изображения: отражение по вертикали
-    xor rbp, rbp        ; y = 0
+    mov r12d, r10d      ; Сохраняем height в r12d
+    shr r12d, 1         ; r12d = количество итераций (height/2)
 
 .loop_y:
-    cmp rbp, rbx        ; y < height?
-    jge .end_loop_y
+    mov rsi, r14        ; rsi = текущая верхняя строка
+    mov rdi, r15        ; rdi = текущая нижняя строка
+    mov ecx, r8d        ; ecx = line_size (счетчик байт)
 
-    ; mirrored_y = height - 1 - y
-    mov rax, rbx
-    dec rax
-    sub rax, rbp
+    mov r11, rcx
+    shr r11, 3          ; r11 = количество 8-байтовых блоков
+    jz .rest_bytes      ; Если нет полных блоков, перейти к остатку
 
-    ; buffer_row_start = mirrored_y * (width * channels)
-    mov rdx, r15
-    imul rdx, r12
-    imul rdx, rax
+.loop_qword:
+    mov rax, [rsi]      ; Загружаем 8 байт из верхней строки
+    mov rdx, [rdi]      ; Загружаем 8 байт из нижней строки
+    mov [rsi], rdx      ; Сохраняем в верхнюю строку
+    mov [rdi], rax      ; Сохраняем в нижнюю строку
+    add rsi, 8
+    add rdi, 8
+    dec r11
+    jnz .loop_qword
 
-    ; image_row_start = y * (width * channels)
-    mov r10, rbp
-    imul r10, r15
-    imul r10, r12
+.rest_bytes:
+    ; Обработка оставшихся байтов (0-7)
+    mov rcx, r8
+    and rcx, 7          ; rcx = остаток байтов
+    jz .next_line       ; Если остатка нет, перейти к след. строке
 
-    xor r11, r11        ; x = 0
+.loop_byte:
+    mov al, [rsi]       ; Читаем байт из верхней строки
+    mov dl, [rdi]       ; Читаем байт из нижней строки
+    mov [rsi], dl       ; Пишем в верхнюю строку
+    mov [rdi], al       ; Пишем в нижнюю строку
+    inc rsi
+    inc rdi
+    loop .loop_byte
 
-.loop_x:
-    cmp r11, r15        ; x < width?
-    jge .end_loop_x
+.next_line:
+    ; Переход к следующим строкам
+    add r14, r8         ; Сдвигаем верхний указатель вниз
+    sub r15, r8         ; Сдвигаем нижний указатель вверх
+    dec r12d            ; Уменьшаем счетчик итераций
+    jnz .loop_y
 
-    ; buffer_pixel_start = buffer_row_start + x * channels
-    mov rax, r11
-    imul rax, r12
-    add rax, rdx
-
-    ; image_pixel_start = image_row_start + x * channels
-    mov r9, r11
-    imul r9, r12
-    add r9, r10
-
-    ; Копируем каналы из буфера в изображение
-    mov rsi, r13
-    add rsi, rax        ; источник: buffer + buffer_pixel_start
-    mov rdi, r14
-    add rdi, r9         ; приемник: image + image_pixel_start
-
-    mov rcx, r12        ; количество байт (channels)
-    rep movsb           ; копируем
-
-    inc r11             ; x++
-    jmp .loop_x
-
-.end_loop_x:
-    inc rbp             ; y++
-    jmp .loop_y
-
-.end_loop_y:
-    ; Освобождаем буфер
-
-.error:
-    ; Восстанавливаем регистры и возвращаемся
+.end_func:
     pop r15
     pop r14
     pop r13
     pop r12
     pop rbx
-    pop rbp
     ret
