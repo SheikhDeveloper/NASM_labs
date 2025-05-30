@@ -1,8 +1,9 @@
 bits 64
 section .data
     input_format    db "%f", 0             ; Input format for x
-    output_format   db "Result: %.*f", 10, 0 ; Output format
-    file_format     db "%d: %.6f", 10, 0   ; File format
+    lib_format      db "Library sinh(x): %.*f", 10, 0 ; Library sinh(x) print format
+    output_format   db "My sinh(x): %.*f", 10, 0 ; Output format
+    file_format     db "%d: %.*f", 10, 0   ; File format
     error_args      db "Error: expected filename argument", 10, 0
     error_file      db "Error: could not open file", 10, 0
     error_input     db "Error: invalid input", 10, 0
@@ -11,6 +12,7 @@ section .data
     input_epsilon   db "Input epsilon: ", 0
     align 16
     abs_mask        dd 0x7FFFFFFF, 0, 0, 0 ; Mask for absolute value
+    one             dq 1.0
 
 section .bss
     x               resd 1                 ; Input x value
@@ -23,7 +25,7 @@ section .bss
 
 section .text
     global main
-    extern scanf, printf, fopen, fprintf, fclose, exit, getchar, sinh, log10, floor
+    extern scanf, printf, fopen, fprintf, fclose, exit, getchar, sinh, log10, ceil
 
 main:
     push rbp
@@ -69,19 +71,28 @@ main:
     jle .input_error
 
     ; Calculate log10(epsilon) (decimal length of epsilon)
-    movsd    xmm0, qword [epsilon]
-    call     log10
-    xorpd    xmm1, xmm1
-    subsd    xmm1, xmm0
-    movapd   xmm0, xmm1
-    call     floor
-    cvtsd2si r15d, xmm0
-    cmp      r15d, 0
-    jge      .r15d_ok
-    mov      r15d, 0
+    cvtss2sd xmm0, [epsilon]   ; float -> double
+    comisd   xmm0, [one]        ; compare epsilon with 1.0
+    jae      .set_zero          ; epsilon >= 1.0 -> precision=0
 
-    .r15d_ok:
-    mov     [print_precision], r15d
+    call     log10              ; xmm0 = log10(epsilon)
+    xorpd    xmm1, xmm1
+    subsd    xmm1, xmm0         ; xmm1 = -log10(epsilon)
+    movapd   xmm0, xmm1         ; xmm0 = -log10(epsilon)
+    call     ceil               ; xmm0 = ceil(-log10(epsilon))
+    cvtsd2si r15d, xmm1         ; xmm0 -> int
+    jmp      .set_precision
+
+    .set_zero:
+    mov r15d, 0                 ; precision = 0 for epsilon >= 1.0
+
+    .set_precision:
+    cmp r15d, 0
+    jge .store_precision
+    mov r15d, 0                 
+
+    .store_precision:
+    mov [print_precision], r15d
 
     ; Initialization
     movss xmm0, [x]
@@ -103,6 +114,7 @@ main:
     mov edx, [n]
     cvtss2sd xmm0, [current_term]
     mov rax, 1
+    mov rcx, r15
     call fprintf
 
     ; Calculate next term: current_term * x² / ((2n)(2n+1))
@@ -126,7 +138,15 @@ main:
     jmp .loop
 
 .end_loop:
-    ; Print sum
+    ; calculate sinh(x) using libm
+    cvtss2sd xmm0, [x]
+    call    sinh ; xmm0 = sinh(x)
+    mov rdi, lib_format
+    mov rsi, r15
+    mov rax, 1
+    call printf
+
+    ; Print sum and sinh(x)
     cvtss2sd xmm0, [sum]
     mov rdi, output_format
     mov rsi, r15
