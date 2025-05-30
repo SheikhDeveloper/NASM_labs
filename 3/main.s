@@ -33,72 +33,10 @@ string_len:
     .exit:
     ret
 
-; Ceasar Cipher function
-; rcx - shift value
-; rbx - string
-; rdx - string length
-; return: rax = encoded string
-ceasar_cipher:
-    push r9
-    mov r9, rcx ; save shift value
-    xor rcx, rcx ; counter = 0
-    
-    .loop:
-    cmp rcx, rdx 
-    jge .exit ; if counter >= string length, exit
-    movzx r12, byte [rbx + rcx] ; get char
-    cmp r12, 'A' 
-    jl .isalpha_else ; if char < 'A', skip
-    cmp r12, 'Z'
-    jle .isupper_condition ; if 'A' <= char <= 'Z', then it is lower case
-    cmp r12, 'a'
-    jl .isalpha_else ; if 'Z' < char < 'a', skip
-    cmp r12, 'z'
-    jle .islower_condition ; if 'a' <= char <= 'z', then it is upper case
-    jg .isalpha_else ; if char > 'z', skip
-    jmp .loop
-
-    .islower_condition:
-    sub r12, 'a'
-    add r12, r9
-    mov rax, r12
-    push rdx
-    xor rdx, rdx
-    mov r12, 26
-    div r12
-    add rdx, 'a' ; rdx = (char - 'a' + shift) % 26 + 'a'
-    mov byte [rbx + rcx], dl ; mov char to string
-    pop rdx
-    jmp .loop_step
-
-    .isupper_condition:
-    sub r12, 'A'
-    add r12, r9
-    mov rax, r12
-    push rdx
-    xor rdx, rdx
-    mov r12, 26
-    div r12
-    add rdx, 'A' ; rdx = (char - 'A' + shift) % 26 + 'A'
-    mov byte [rbx + rcx], dl ; mov char to string
-    pop rdx
-    jmp .loop_step
-
-    .isalpha_else:
-
-    .loop_step:
-    inc rcx ; increment counter
-    jmp .loop
-
-    .exit:
-    mov rax, rbx ; return encoded string
-    pop r9
-    ret
-
 ; Trim spaces function
-; Input: rbx - buffer, rdx - length
+; Input: rbx - buffer, rdx - length, r8 - shift
 ; Output: rdx - new length
-trim_spaces:
+process_string:
     push rbx
     push rsi
     push rdi
@@ -165,6 +103,39 @@ trim_spaces:
 
     .not_space:
     mov r9, 0
+    cmp al, 'A'
+    jl .after_cypher ; if char < 'A', skip
+    cmp al, 'Z'
+    jle .isupper_condition ; if char > 'Z', go to isupper_condition
+    cmp al, 'a'
+    jl .after_cypher ; if char < 'a', skip
+    cmp al, 'z'
+    jle .islower_condition ; if char > 'z', go to islower_condition 
+
+    .isupper_condition:
+    sub rax, 'A'
+    add rax, r8
+    push rdx
+    xor rdx, rdx
+    mov r12, 26
+    div r12
+    add rdx, 'A' ; rdx = (char - 'A' + shift) % 26 + 'A'
+    mov rax, rdx ; rax = new char
+    pop rdx
+    jmp .after_cypher
+
+    .islower_condition:
+    sub rax, 'a'
+    add rax, r8
+    push rdx
+    xor rdx, rdx
+    mov r12, 26
+    div r12
+    add rdx, 'a' ; rdx = (char - 'a' + shift) % 26 + 'a'
+    mov rax, rdx ; rax = new char
+    pop rdx
+
+    .after_cypher:
     mov [rdi], al
     inc rdi
 
@@ -313,7 +284,7 @@ _start:
     mov rcx, 26
     xor rdx, rdx
     div rcx
-    mov r8, rdx
+    mov r8, rdx ; r8 = true key
 
     .process_loop:
     mov rax, 0 ; read from descriptor
@@ -326,18 +297,13 @@ _start:
     mov rbx, file_buffer
     mov rdx, rax
 
-    call trim_spaces
+    call process_string
 
-    push rcx
-    mov rcx, r8
-    call ceasar_cipher
-    mov r13, rax
-    pop rcx
     cmp rdx, 0
     jle .process_loop
     mov rax, 1 ; write
     mov rdi, 1 ; stdout
-    mov rsi, r13 ; encoded string
+    mov rsi, rbx ; encoded string
     mov rdx, rdx ; length of encoded string
     syscall
     jmp .process_loop
