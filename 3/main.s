@@ -12,6 +12,7 @@ section .data
     error_msg db "Input Format error", 0
     env_error_msg db "ENV arguments error", 0
     newline db 0xA ; '\n' symbol
+    space db ' '
 
 section .bss
     src_ptr resq 1
@@ -42,7 +43,9 @@ process_string:
     push rdi
     push rcx
     push rax
+    push r14
 
+    mov r14b, [space]
     mov rsi, rbx        ; Source pointer
     mov rdi, rbx        ; Destination pointer
     xor rcx, rcx        ; Source index
@@ -102,6 +105,8 @@ process_string:
     jmp .next
 
     .not_space:
+    cmp al, 0x09        ; '\t'
+    je .insert_space
     mov r9, 0
     cmp al, 'A'
     jl .after_cypher ; if char < 'A', skip
@@ -112,6 +117,13 @@ process_string:
     cmp al, 'z'
     jle .islower_condition ; if char < 'z', go to islower_condition 
     jg .after_cypher
+
+    .insert_space:
+    cmp r9, 1
+    je .skip_copy
+    mov [rdi], r14b
+    inc rdi
+    jmp .next
 
     .isupper_condition:
     sub rax, 'A'
@@ -172,6 +184,7 @@ process_string:
     mov rdx, rdi
     sub rdx, rbx        ; New length
 
+    pop r14
     pop rax
     pop rcx
     pop rdi
@@ -188,7 +201,7 @@ _start:
     add rsi, rcx ; rsi = address of argv[argc]
     add rsi, 8 ; skip NULL argument
     mov rbx, rsi ; rbx = envp[0]
-    mov r12, rsi ; r12 = envp[0], to search for KEY
+    mov r15, rsi ; r12 = envp[0], to search for KEY
 
     mov r9, 1
 
@@ -202,7 +215,6 @@ _start:
     repe cmpsb
     je .found_src
     add rbx, 8 ; go to next envp string
-    mov r12, rbx
     jmp .find_src
     
     .found_src:
@@ -211,7 +223,7 @@ _start:
     mov [src_ptr], rax
 
     .after_src:
-    mov rbx, r12 ; rbx = envp[0]
+    mov rbx, r15 ; rbx = envp[0]
 
     .find_key:
     mov rdx, [rbx] ; rdx = envp[i] pointer
