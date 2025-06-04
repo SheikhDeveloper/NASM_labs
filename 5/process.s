@@ -10,7 +10,7 @@ process_image_asm:
     push r14
     push r15
 
-    mov r9, [rdi]       ; r9 = *image (указатель на данные изображения)
+    mov r9, rdi       ; r9 = *image (указатель на данные изображения)
     mov eax, esi        ; width
     imul eax, ecx       ; eax = width * channels (line_size)
     mov r8d, eax        ; r8d = line_size
